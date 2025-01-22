@@ -83,7 +83,7 @@ This project is licensed under the GNU Lesser General Public License v3.0 or lat
 Copyright notices:
 - Original algorithm: © 2005 Philip Koehn and Josh Schroeder
 - Python implementation: © 2010 Digital Silk Road, © 2017 Linas Valiukas
-- Rust implementation: [Current Year] [Your Name/Organization]
+- Rust implementation: 2025 mrorigo<mrorigo@gmail.com>
 
 ## Contributing
 
