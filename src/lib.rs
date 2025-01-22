@@ -1,9 +1,7 @@
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::collections::{HashMap, HashSet};
-use std::fs::File;
+use std::collections::HashMap;
 use std::io::{self, BufRead, BufReader};
-use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 /// Custom error type for sentence splitter operations
@@ -87,50 +85,12 @@ pub struct SentenceSplitter {
     non_breaking_prefixes: HashMap<String, PrefixType>,
 }
 
-fn is_closing_punctuation(c: char) -> bool {
-    matches!(
-        c,
-        ')' | ']'
-            | '}'
-            | '"'
-            | '\'' // Smart quote
-            | '»'
-            | '›'
-            | '」'
-            | '』'
-            | '〉'
-            | '》'
-            | '】'
-            | '〕'
-            | '｣'
-    )
-}
-
-fn is_sentence_starter(c: char) -> bool {
-    c.is_uppercase()
-        || c == '"'
-        || c == '('
-        || c.is_numeric()
-        || c == '«'  // Add guillemet
-        || c == '¿'  // Spanish/Portuguese question mark
-        || c == '¡'  // Spanish/Portuguese exclamation mark
-        || c == '"'  // Smart quote
-        || c == 0x27 as char // Smart quote
-        || c == '‹'  // Single guillemet
-        || c == '「' // CJK quote
-        || c == '『' // CJK quote
-}
-
 impl SentenceSplitter {
     /// Create a new SentenceSplitter instance
     ///
     /// # Arguments
     /// * `language` - ISO 639-1 language code
-    /// * `non_breaking_prefix_file` - Optional path to non-breaking prefix file
-    pub fn new<P: AsRef<Path>>(
-        language: &str,
-        non_breaking_prefix_file: Option<P>,
-    ) -> Result<Self> {
+    pub fn new(language: &str) -> Result<Self> {
         // Validate language code
         let lang_regex = Regex::new(r"^[a-z][a-z]$").unwrap();
         if !lang_regex.is_match(language) {
@@ -290,46 +250,40 @@ impl SentenceSplitter {
 ///
 /// For better performance, use SentenceSplitter struct directly to avoid reloading
 /// non-breaking prefix file on every call.
-pub fn split_text_into_sentences<P: AsRef<Path>>(
-    text: &str,
-    language: &str,
-    non_breaking_prefix_file: Option<P>,
-) -> Result<Vec<String>> {
-    let splitter = SentenceSplitter::new(language, non_breaking_prefix_file)?;
+pub fn split_text_into_sentences(text: &str, language: &str) -> Result<Vec<String>> {
+    let splitter = SentenceSplitter::new(language)?;
     Ok(splitter.split(text))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
-    use tempfile::NamedTempFile;
 
-    // #[test]
-    // fn test_invalid_language_code() {
-    //     let result = SentenceSplitter::new("/etc/passwd", None::<PathBuf>);
-    //     assert!(matches!(
-    //         result,
-    //         Err(SentenceSplitterError::InvalidLanguageCode(_))
-    //     ));
-    // }
+    #[test]
+    fn test_invalid_language_code() {
+        let result = SentenceSplitter::new("/etc/passwd");
+        assert!(matches!(
+            result,
+            Err(SentenceSplitterError::InvalidLanguageCode(_))
+        ));
+    }
 
-    // #[test]
-    // fn test_unsupported_language() {
-    //     let result = SentenceSplitter::new("xx", None::<PathBuf>);
-    //     // Should succeed but with empty prefix list
-    //     assert!(result.is_ok());
-    // }
+    #[test]
+    fn test_unsupported_language() {
+        let result = SentenceSplitter::new("xx");
+        // Should succeed but with empty prefix list
+        assert!(result.is_ok());
+    }
 
-    // #[test]
-    // fn test_text_empty() {
-    //     let splitter = SentenceSplitter::new("en", None::<PathBuf>).unwrap();
-    //     assert_eq!(splitter.split(""), Vec::<String>::new());
-    // }
+    #[test]
+    fn test_text_empty() {
+        let splitter = SentenceSplitter::new("en").unwrap();
+        assert_eq!(splitter.split(""), Vec::<String>::new());
+    }
 
     #[test]
     fn test_en() {
-        let splitter = SentenceSplitter::new("en", None::<PathBuf>).unwrap();
+        let splitter = SentenceSplitter::new("en").unwrap();
 
         // Test case 1
         let input_text =
@@ -364,7 +318,7 @@ mod tests {
 
     #[test]
     fn test_en_numeric_only() {
-        let splitter = SentenceSplitter::new("en", None::<PathBuf>).unwrap();
+        let splitter = SentenceSplitter::new("en").unwrap();
         let input_text = "Hello. No. 1. No. 2. Prefix. 1. Prefix. 2. Good bye.";
         let expected_sentences = vec![
             "Hello.",
@@ -381,7 +335,7 @@ mod tests {
 
     #[test]
     fn test_en_uppercase_acronym() {
-        let splitter = SentenceSplitter::new("en", None::<PathBuf>).unwrap();
+        let splitter = SentenceSplitter::new("en").unwrap();
         let input_text = "Hello. .NATO. Good bye.";
         let expected_sentences = vec!["Hello. .NATO. Good bye."];
         assert_eq!(splitter.split(input_text), expected_sentences);
@@ -389,7 +343,7 @@ mod tests {
 
     #[test]
     fn test_en_sentence_within_brackets() {
-        let splitter = SentenceSplitter::new("en", None::<PathBuf>).unwrap();
+        let splitter = SentenceSplitter::new("en").unwrap();
         let input_text = "Foo bar. (Baz foo.) Bar baz.";
         let expected_sentences = vec!["Foo bar.", "(Baz foo.)", "Bar baz."];
         assert_eq!(splitter.split(input_text), expected_sentences);
@@ -397,7 +351,7 @@ mod tests {
 
     #[test]
     fn test_de() {
-        let splitter = SentenceSplitter::new("de", None::<PathBuf>).unwrap();
+        let splitter = SentenceSplitter::new("de").unwrap();
         let input_text = "Nie hätte das passieren sollen. Dr. Soltan sagte: \"Der Fluxcompensator war doch kalibriert!\".";
         let expected_sentences = vec![
             "Nie hätte das passieren sollen.",
@@ -408,7 +362,7 @@ mod tests {
 
     #[test]
     fn test_fr() {
-        let splitter = SentenceSplitter::new("fr", None::<PathBuf>).unwrap();
+        let splitter = SentenceSplitter::new("fr").unwrap();
         let input_text = "Brookfield Office Properties Inc. (« BOPI »), dont les actifs liés aux immeubles directement...";
         let expected_sentences = vec![input_text];
         assert_eq!(splitter.split(input_text), expected_sentences);
@@ -416,7 +370,7 @@ mod tests {
 
     #[test]
     fn test_el() {
-        let splitter = SentenceSplitter::new("el", None::<PathBuf>).unwrap();
+        let splitter = SentenceSplitter::new("el").unwrap();
         let input_text = "Όλα τα συστήματα ανώτατης εκπαίδευσης σχεδιάζονται σε εθνικό επίπεδο. Η ΕΕ αναλαμβάνει κυρίως να συμβάλει στη βελτίωση της συγκρισιμότητας μεταξύ των διάφορων συστημάτων και να βοηθά φοιτητές και καθηγητές να μετακινούνται με ευκολία μεταξύ των συστημάτων των κρατών μελών.";
         let expected_sentences = vec![
             "Όλα τα συστήματα ανώτατης εκπαίδευσης σχεδιάζονται σε εθνικό επίπεδο.",
@@ -427,7 +381,7 @@ mod tests {
 
     #[test]
     fn test_pt() {
-        let splitter = SentenceSplitter::new("pt", None::<PathBuf>).unwrap();
+        let splitter = SentenceSplitter::new("pt").unwrap();
         let input_text = "Isto é um parágrafo. Contém várias frases. «Mas porquê,» perguntas tu?";
         let expected_sentences = vec![
             "Isto é um parágrafo.",
@@ -439,7 +393,7 @@ mod tests {
 
     #[test]
     fn test_es() {
-        let splitter = SentenceSplitter::new("es", None::<PathBuf>).unwrap();
+        let splitter = SentenceSplitter::new("es").unwrap();
         let input_text = "La UE ofrece una gran variedad de empleos en un entorno multinacional y multilingüe. La Oficina Europea de Selección de Personal (EPSO) se ocupa de la contratación, sobre todo mediante oposiciones generales.";
         let expected_sentences = vec![
             "La UE ofrece una gran variedad de empleos en un entorno multinacional y multilingüe.",
@@ -472,7 +426,7 @@ mod tests {
             "It contains several sentences.",
             "\"But why,\" you ask?",
         ];
-        let result = split_text_into_sentences(input_text, "en", None::<PathBuf>).unwrap();
+        let result = split_text_into_sentences(input_text, "en").unwrap();
         assert_eq!(result, expected_sentences);
     }
 }
