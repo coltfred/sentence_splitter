@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use std::io::{self, BufRead, BufReader};
 use thiserror::Error;
 
-/// Custom error type for sentence splitter operations
 #[derive(Error, Debug)]
 pub enum SentenceSplitterError {
     #[error("Invalid language code: {0}")]
@@ -20,7 +19,6 @@ pub enum SentenceSplitterError {
     RegexError(#[from] regex::Error),
 }
 
-/// Type alias for Result with SentenceSplitterError
 type Result<T> = std::result::Result<T, SentenceSplitterError>;
 
 lazy_static! {
@@ -72,16 +70,13 @@ lazy_static! {
     };
 }
 
-/// Enum representing the type of non-breaking prefix
 #[derive(Debug, Clone, PartialEq)]
 pub enum PrefixType {
     Default,
     NumericOnly,
 }
 
-/// Main struct for splitting text into sentences
 pub struct SentenceSplitter {
-    /// Dictionary of non-breaking prefixes; keys are string prefixes, values are PrefixType enums
     non_breaking_prefixes: HashMap<String, PrefixType>,
 }
 
@@ -105,12 +100,10 @@ impl SentenceSplitter {
             .cloned()
             .unwrap_or_default();
 
-        // Create a reader for the non-breaking prefixes file contents
         let reader = BufReader::new(non_breaking_prefixes_file_contents.as_bytes());
         for line in reader.lines() {
             let line = line?;
 
-            // Skip empty lines and comments
             if line.trim().is_empty() || line.trim_start().starts_with('#') {
                 continue;
             }
@@ -121,7 +114,6 @@ impl SentenceSplitter {
                 PrefixType::Default
             };
 
-            // Remove comments and clean up the line
             let clean_line = line.split('#').next().unwrap_or("").trim().to_string();
 
             if !clean_line.is_empty() {
@@ -144,7 +136,6 @@ impl SentenceSplitter {
             return vec![];
         }
 
-        // Normalize spaces first
         let text = CLEANUP_SPACES.replace_all(text, " ");
         let text = text.trim();
 
